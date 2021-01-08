@@ -4,10 +4,22 @@ const pug = require('pug');
 const path = require('path');
 var mongodb = require('mongodb');
 const bcrypt = require('bcrypt');
+const nodemailer = require("nodemailer");
 require('dotenv').config({ path: path.join(__dirname, "../bin/.env") })
 const MongoClient = require('mongodb').MongoClient
 const uri = `mongodb+srv://dBanusu90:${process.env.DB_PASS}@Cluster0.xudfg.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 
+
+let mailSendPath = "../public/javascripts/mailsend.js"
+// let mailSendPath = path.join(__dirname,"../public/javascripts/mainsend.js")
+let {welcomeMail, problemSigningIn} = require(mailSendPath)
+
+const user2 = {
+    name: "Anunay",
+    email: 'anusu90@gmail.com'
+}
+
+problemSigningIn(user2);
 
 /* GET users listing. */
 router.get('/', function (req, res, next) {
@@ -95,16 +107,19 @@ router.post("/registeruser", async (req, res) => {
       })
     } else {
 
+      let randString = require('crypto').randomBytes(8).toString('hex')
       let salt = await bcrypt.genSalt(10)
       let hashedPass = await bcrypt.hash(req.body.password, salt);
       req.body.password = hashedPass;
       req.body.isActive = false;
-      console.log(hashedPass);
-
+      req.body.randString = randString;
+      // console.log(hashedPass);
+      
       let input = await userDBCollection.insertOne(req.body);
       await client.close();
-
+      
       if (input.insertedCount === 1) {
+        welcomeMail(req.body,randString);
         res.status(200).json({
           "message": "user inserted"
         })
@@ -118,6 +133,50 @@ router.post("/registeruser", async (req, res) => {
   } catch (error) {
     console.log(error)
   }
+
+})
+
+
+router.get("/activateuser/:urlParams", async (req, res) => {
+  let urlDataString = req.params.urlParams
+  let urlData = urlDataString.split('&').map(v => v.split('='))
+  userEmail = urlData[0][1];
+  randKey = urlData[1][1];
+  timeOfVerification = urlData[2][1];
+
+  if ((Date.now() - timeOfVerification) < 1000 * 60 * 60) {
+    res.status(404).json({
+      "message": "Activation timed out. Please re-register"
+    })
+  } else {
+    try {
+      const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+      let conn = await client.connect();
+      let userDBCollection = client.db('user-flow').collection("users");
+      let user = await userDBCollection.findOne({
+        email: userEmail
+      });
+      if (user) {
+        if (user.randKey === randKey) {
+          // Update the user as active
+        } else {
+          res.status(401).json({
+            "message": "Invalid random key"
+          })
+
+        }
+      } else {
+        res.status(401).json({
+          "message": "Invalid user"
+        })
+      }
+      await client.close();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+
 
 })
 
