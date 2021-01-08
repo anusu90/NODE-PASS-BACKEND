@@ -9,9 +9,13 @@ require('dotenv').config({ path: path.join(__dirname, "../bin/.env") })
 const MongoClient = require('mongodb').MongoClient
 const uri = `mongodb+srv://dBanusu90:${process.env.DB_PASS}@Cluster0.xudfg.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 
+// SETTING CONSTANTS
+let frontEndURL = "http://127.0.0.1:5500/JS/NODE-PASSWORD-RESET/NODE_PASS_RES_FRONTEND/index.html"
+
+
+//IMPORTING MAILSEND JS
 
 let mailSendPath = "../public/javascripts/mailsend.js"
-// let mailSendPath = path.join(__dirname,"../public/javascripts/mainsend.js")
 let {welcomeMail, problemSigningIn} = require(mailSendPath)
 
 const user2 = {
@@ -42,6 +46,24 @@ router.get('/showusers', async function (req, res) {
   }
 });
 
+
+router.get('/checkActiveState/:email', async function (req, res) {
+  try {
+    const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+    await client.connect();
+    console.log("connection done")
+    let userDBCollection = client.db('user-flow').collection("users");
+    let findUser = await userDBCollection.findOne({ email : req.params.email})
+    await client.close();
+    res.json({
+      "activeState": findUser.isActive,
+    });
+
+  } catch (error) {
+    console.log(error)
+  }
+});
+
 /////////LOGIN BACKEND
 
 router.post("/login", async (req, res) => {
@@ -56,7 +78,7 @@ router.post("/login", async (req, res) => {
       email: req.body.email
     });
 
-    if (user) {
+    if (user.isActive) {
       let compare = await bcrypt.compare(req.body.password, user.password);
       if (compare === true) {
         //Generate Token
@@ -69,7 +91,7 @@ router.post("/login", async (req, res) => {
       }
     } else {
       res.status(401).json({
-        "message": "Invalid user"
+        "message": "Invalid user or Inactive user"
       })
 
     }
@@ -144,7 +166,9 @@ router.get("/activateuser/:urlParams", async (req, res) => {
   randKey = urlData[1][1];
   timeOfVerification = urlData[2][1];
 
-  if ((Date.now() - timeOfVerification) < 1000 * 60 * 60) {
+  console.log(Date.now() - timeOfVerification);
+
+  if ((Date.now() - timeOfVerification) > 1000 * 60 * 60) {
     res.status(404).json({
       "message": "Activation timed out. Please re-register"
     })
@@ -156,18 +180,44 @@ router.get("/activateuser/:urlParams", async (req, res) => {
       let user = await userDBCollection.findOne({
         email: userEmail
       });
+
+      console.log(user);
+
       if (user) {
-        if (user.randKey === randKey) {
+        if (user.randString == randKey) {
+
+          let updateStatus  = await userDBCollection.updateOne({email: userEmail}, {$set: {isActive: true}});
+
+          if (updateStatus.modifiedCount === 1){
+
+            let message =  "success"
+            res.render("../views/verification/verificationInProgress.pug", {email: userEmail, message:message},(err, html) => {
+              if (err) throw err;
+              res.send(html);
+            } )
+          } else {
+            let message=  "Unknown error occuered";
+            res.render("../views/verification/verificationInProgress.pug", {email: userEmail, message:message},(err, html) => {
+              if (err) throw err;
+              res.send(html);
+            } )
+          }
+
           // Update the user as active
         } else {
-          res.status(401).json({
-            "message": "Invalid random key"
-          })
 
+          let message = "Invalid random key";
+          res.render("../views/verification/verificationInProgress.pug", { email: userEmail, message: message }, (err, html) => {
+            if (err) throw err;
+            res.send(html);
+          } )
         }
       } else {
-        res.status(401).json({
-          "message": "Invalid user"
+
+        let message = "Invalid user";
+        res.render("../views/verification/verificationInProgress.pug", { email: userEmail, message: message }, (err, html) => {
+          if (err) throw err;
+          res.send(html);
         })
       }
       await client.close();
@@ -183,19 +233,27 @@ router.get("/activateuser/:urlParams", async (req, res) => {
 
 
 
-
-
-
 router.get('/pug', function (req, res) {
-
-  loginFormPath = path.join(__dirname, "../views/loginForm.pug");
-
+  
+  loginFormPath = path.join(__dirname, "../views/verification/verificationInProgress.pug");
+  
   let outhtml = pug.renderFile(loginFormPath, {
-    title: "Hello",
-    message: "Anunay Sinha"
+    title: "Welcome",
+    userName: "Anunay Sinha"
   });
-  console.log(outhtml);
-  res.send(outhtml)
+  
+  let pageVerificationComplete = "../views/verification/verificationSuccess.pug"
+
+  // res.render(pageVerificationComplete)
+  
+  
+  res.status(200).render("../views/verification/verificationInProgress.pug", {email: "anusu90@gmail.com"},(err, html) => {
+    if (err) throw err;
+    res.send(html);
+  } )
+  
+  // console.log(outhtml);
+  // res.send(outhtml)
 
 });
 
