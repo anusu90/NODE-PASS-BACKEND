@@ -1,0 +1,42 @@
+doctype html
+html(lang='en')
+  head
+    meta(charset='UTF-8')
+    meta(name='viewport' content='width=device-width, initial-scale=1.0')
+    script(src='https://kit.fontawesome.com/24a924ca11.js' crossorigin='anonymous')
+    link(rel='preconnect' href='https://fonts.gstatic.com')
+    link(href='https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap' rel='stylesheet')
+    link(rel='preconnect' href='https://fonts.gstatic.com')
+    link(href='https://fonts.googleapis.com/css2?family=Ubuntu&display=swap' rel='stylesheet')
+    title#myTitle  success 
+    style.
+      .loader {
+      /* animation: myAnimation 5s linear infinite; */
+      position: absolute;
+      margin: auto;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      }
+      @keyframes myAnimation {
+      form {
+      transform: rotate(0deg);
+      }
+      to {
+      transform: rotate(360deg);
+      }
+      }
+  body(style='height: 100vh; width: 100%; position: relative; background-color: whitesmoke')
+    div(style="width: 580px; height:400px; background-color: #78aaaa; position: absolute; margin: auto auto; left: 0 ;right: 0; font-family:'Ubuntu', sans-serif; top: 0; bottom: 0; border-radius: 20px; text-align: center;")
+      p#myuser.myuser(style="display:inline-block; font-size: 32px; color: rgb(10, 3, 3); font-family:'Ubuntu', sans-serif; margin-left: 10px; text-align: center; width: 100%;")
+        | Invalid access. Login or Register to move forward.
+      img(src='../images/error.png' style='width: 40%;' alt='' srcset='')
+      #myLoader.loader
+    script.
+      let backendURl = "http://localhost:3002/users"
+      let frontendURL = "http://127.0.0.1:5500/JS/NODE-PASSWORD-RESET/NODE_PASS_RES_FRONTEND/index.html"
+      let loader = document.getElementById("mySpinner");
+      setTimeout(() => {
+      window.location.href = frontendURL;
+      }, 3000);

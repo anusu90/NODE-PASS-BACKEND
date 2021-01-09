@@ -9,21 +9,24 @@ require('dotenv').config({ path: path.join(__dirname, "../bin/.env") })
 const MongoClient = require('mongodb').MongoClient
 const uri = `mongodb+srv://dBanusu90:${process.env.DB_PASS}@Cluster0.xudfg.mongodb.net/<dbname>?retryWrites=true&w=majority`;
 
+var jwt = require('jsonwebtoken')
+
 // SETTING CONSTANTS
 let frontEndURL = "http://127.0.0.1:5500/JS/NODE-PASSWORD-RESET/NODE_PASS_RES_FRONTEND/index.html"
 
 
 //IMPORTING MAILSEND JS
 
-let mailSendPath = "../public/javascripts/mailsend.js"
-let {welcomeMail, problemSigningIn} = require(mailSendPath)
+// let mailSendPath = "../public/javascripts/mailsend.js"
+let mailSendPath = "../bin/mailsend.js"
+let { welcomeMail, problemSigningIn } = require(mailSendPath)
 
 const user2 = {
-    name: "Anunay",
-    email: 'anusu90@gmail.com'
+  name: "Anunay",
+  email: 'anusu90@gmail.com'
 }
 
-problemSigningIn(user2);
+// problemSigningIn(user2);
 
 /* GET users listing. */
 router.get('/', function (req, res, next) {
@@ -53,7 +56,7 @@ router.get('/checkActiveState/:email', async function (req, res) {
     await client.connect();
     console.log("connection done")
     let userDBCollection = client.db('user-flow').collection("users");
-    let findUser = await userDBCollection.findOne({ email : req.params.email})
+    let findUser = await userDBCollection.findOne({ email: req.params.email })
     await client.close();
     res.json({
       "activeState": findUser.isActive,
@@ -72,7 +75,7 @@ router.post("/login", async (req, res) => {
 
     const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
     let conn = await client.connect();
-    console.log(conn);
+    // console.log(conn);
     let userDBCollection = client.db('user-flow').collection("users");
     let user = await userDBCollection.findOne({
       email: req.body.email
@@ -81,9 +84,15 @@ router.post("/login", async (req, res) => {
     if (user && user.isActive) {
       let compare = await bcrypt.compare(req.body.password, user.password);
       if (compare === true) {
+        let token = jwt.sign({ user: user }, process.env.RANDOM_KEY_FOR_JWT, { expiresIn: 20 })
+        console.log(token)
         //Generate Token
         console.log(user);
-        res.json(user);
+        // const authHeader = {'authorization': `BEARER ${token}`}
+        res.status(200).json({
+          'authorization': `BEARER ${token}`
+        })
+        // res.json(user);
       } else {
         res.status(401).json({
           "message": "Invalid password"
@@ -111,13 +120,10 @@ router.post("/login", async (req, res) => {
 router.post("/registeruser", async (req, res) => {
 
   try {
-
     console.log(req.body);
-
     const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
     await client.connect();
     let userDBCollection = client.db('user-flow').collection("users");
-
     let user = await userDBCollection.findOne({
       email: req.body.email
     });
@@ -136,12 +142,12 @@ router.post("/registeruser", async (req, res) => {
       req.body.isActive = false;
       req.body.randString = randString;
       // console.log(hashedPass);
-      
+
       let input = await userDBCollection.insertOne(req.body);
       await client.close();
-      
+
       if (input.insertedCount === 1) {
-        welcomeMail(req.body,randString);
+        welcomeMail(req.body, randString);
         res.status(200).json({
           "message": "user inserted"
         })
@@ -186,21 +192,21 @@ router.get("/activateuser/:urlParams", async (req, res) => {
       if (user) {
         if (user.randString == randKey) {
 
-          let updateStatus  = await userDBCollection.updateOne({email: userEmail}, {$set: {isActive: true}});
+          let updateStatus = await userDBCollection.updateOne({ email: userEmail }, { $set: { isActive: true } });
 
-          if (updateStatus.modifiedCount === 1){
+          if (updateStatus.modifiedCount === 1) {
 
-            let message =  "success"
-            res.render("../views/verification/verificationInProgress.pug", {email: userEmail, message:message},(err, html) => {
+            let message = "success"
+            res.render("../views/verification/verificationInProgress.pug", { email: userEmail, message: message }, (err, html) => {
               if (err) throw err;
               res.send(html);
-            } )
+            })
           } else {
-            let message=  "Unknown error occuered";
-            res.render("../views/verification/verificationInProgress.pug", {email: userEmail, message:message},(err, html) => {
+            let message = "Unknown error occuered";
+            res.render("../views/verification/verificationInProgress.pug", { email: userEmail, message: message }, (err, html) => {
               if (err) throw err;
               res.send(html);
-            } )
+            })
           }
 
           // Update the user as active
@@ -210,7 +216,7 @@ router.get("/activateuser/:urlParams", async (req, res) => {
           res.render("../views/verification/verificationInProgress.pug", { email: userEmail, message: message }, (err, html) => {
             if (err) throw err;
             res.send(html);
-          } )
+          })
         }
       } else {
 
@@ -226,32 +232,54 @@ router.get("/activateuser/:urlParams", async (req, res) => {
     }
   }
 
-
-
 })
+
+//MANAGE DASHBOARD
+
+router.get("/dashboard", authenticate, (req, res) => {
+  res.status(200).json({message: "User Logged In"})
+})
+
+function authenticate(req, res, next) {
+  // console.log("the body is", req.body);
+  // console.log("the auth is",req.headers.authorizarion.split(' ')[1]);
+  // console.log(jwt.verify(req.headers.authorizarion.split(' ')[1], process.env.RANDOM_KEY_FOR_JWT));
+  if (req.headers.authorizarion) {
+    if (jwt.verify(req.headers.authorizarion.split(' ')[1], process.env.RANDOM_KEY_FOR_JWT)) {
+      next();
+    } else {
+      // res.status(400).json({message: "Invalid access"})
+      res.status(400).render("../views/login/invalidaccess.pug")
+    }
+
+  } else {
+    // res.status(400).json({message: "Invalid access"})
+    res.status(400).render("../views/login/invalidaccess.pug")
+  }
+}
 
 
 
 
 router.get('/pug', function (req, res) {
-  
+
   loginFormPath = path.join(__dirname, "../views/verification/verificationInProgress.pug");
-  
+
   let outhtml = pug.renderFile(loginFormPath, {
     title: "Welcome",
     userName: "Anunay Sinha"
   });
-  
+
   let pageVerificationComplete = "../views/verification/verificationSuccess.pug"
 
   // res.render(pageVerificationComplete)
-  
-  
-  res.status(200).render("../views/verification/verificationInProgress.pug", {email: "anusu90@gmail.com"},(err, html) => {
+
+
+  res.status(200).render("../views/verification/verificationInProgress.pug", { email: "anusu90@gmail.com" }, (err, html) => {
     if (err) throw err;
     res.send(html);
-  } )
-  
+  })
+
   // console.log(outhtml);
   // res.send(outhtml)
 
