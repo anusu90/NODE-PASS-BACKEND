@@ -78,7 +78,7 @@ router.post("/login", async (req, res) => {
       email: req.body.email
     });
 
-    if (user.isActive) {
+    if (user && user.isActive) {
       let compare = await bcrypt.compare(req.body.password, user.password);
       if (compare === true) {
         //Generate Token
