@@ -51,12 +51,12 @@ async function welcomeMail (user,randString) {
 }
 
 
-async function problemSigningIn(user, randString){
+async function problemSigningIn(user){
 
     let dtnow = Date.now()
     // console.log(dtnow, Date.now(), Date.now() - dtnow);
 
-    let urlToSend = backendURL + "/resetpassword/" + 'user=' + user.email +'&randKey=' + randString + "&dtNow=" + dtnow;
+    let urlToSend = backendURL + "/resetpassword/" + 'user=' + user.email + "&dtNow=" + dtnow;
 
     const mailToUser = {
         from: "sariokay@yahoo.com",
@@ -70,7 +70,16 @@ async function problemSigningIn(user, randString){
         `<a href = "${urlToSend}"> <button style="display: inline-block; background-color: rgb(26, 22, 224); color: white; height: 36px; border: transparent solid; border-radius: 5px; padding: 5px;" >Click Here</button> </a>` +
         `<br><br> This is a system generated mail. Please dont reply to it`
     };
-    console.log(user);
+    
+    const transporter = nodemailer.createTransport({
+        service: 'yahoo',
+        auth: {
+            user: "sariokay@yahoo.com",
+            pass: 'wfexyufcsvonksvf'
+        }
+    });
+    
+    await transporter.sendMail(mailToUser)
 }
 
 module.exports = {welcomeMail: welcomeMail, problemSigningIn:problemSigningIn};

@@ -1,0 +1,14 @@
+button{
+    margin: 10px;
+}
+
+.myTextCenter{
+    background-color: lightskyblue;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+#statusMessage{
+    text-align: left;
+    font-size: 14px;
+}

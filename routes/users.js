@@ -71,8 +71,8 @@ router.get('/checkActiveState/:email', async function (req, res) {
 
 router.post("/login", async (req, res) => {
   try {
+    console.log("i am anunay");
     console.log(req.body);
-
     const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
     let conn = await client.connect();
     // console.log(conn);
@@ -89,6 +89,7 @@ router.post("/login", async (req, res) => {
         //Generate Token
         console.log(user);
         // const authHeader = {'authorization': `BEARER ${token}`}
+        // res.cookie("jwt2", token)
         res.status(200).json({
           'authorization': `BEARER ${token}`
         })
@@ -236,19 +237,22 @@ router.get("/activateuser/:urlParams", async (req, res) => {
 
 //MANAGE DASHBOARD
 
-router.get("/dashboard", authenticate, (req, res) => {
-  res.status(200).json({message: "User Logged In"})
+router.get("/dashboard", authDashBoard, (req, res) => {
+  console.log("I am reaching till here")
+  res.status(200).json({
+    "message": req.body.userEmail
+  })
 })
 
-function authenticate(req, res, next) {
-  // console.log("the body is", req.body);
-  // console.log("the auth is",req.headers.authorizarion.split(' ')[1]);
-  // console.log(jwt.verify(req.headers.authorizarion.split(' ')[1], process.env.RANDOM_KEY_FOR_JWT));
-  if (req.headers.authorizarion) {
-    if (jwt.verify(req.headers.authorizarion.split(' ')[1], process.env.RANDOM_KEY_FOR_JWT)) {
+function authDashBoard(req, res, next) {
+  if (req.headers.authorization) {
+    let myVerifiedUser = (jwt.verify(req.headers.authorization.split(" ")[1], process.env.RANDOM_KEY_FOR_JWT));
+    if (myVerifiedUser) {
+      req.body.userEmail = myVerifiedUser.user.email
       next();
     } else {
       // res.status(400).json({message: "Invalid access"})
+      console.log("Dil bole hadippa")
       res.status(400).render("../views/login/invalidaccess.pug")
     }
 
@@ -259,7 +263,114 @@ function authenticate(req, res, next) {
 }
 
 
+///////////////////////////////////////////////////FORGOT PASSWORD ROUTE///////////////////////////////////////////////////
 
+router.post("/forgotpassword", async (req, res) => {
+  passwordResetEmail = req.body.email;
+
+  console.log(req.headers)
+
+  //first we will search for this email in DB
+
+  try {
+    const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+    await client.connect();
+    let userDBCollection = client.db('user-flow').collection("users");
+    let user = await userDBCollection.findOne({
+      email: passwordResetEmail
+    });
+
+    if (user) {
+      console.log(user)
+      let tokenReset = jwt.sign(user, process.env.RANDOM_KEY_FOR_JWT, { expiresIn: 300 });
+
+
+      // Set-Cookie: resetSariOkayAuth=tokenReset; HttpOnly;
+
+      await userDBCollection.updateOne({
+        email: passwordResetEmail
+      }, { $set: { isPassChangeAllow: true } });
+
+      problemSigningIn(user);
+
+      res.cookie('sariOkayReset', tokenReset, { httpOnly: true, sameSite: 'lax' })
+      // res.setHeader("sariOkayReset", tokenReset)
+      res.status(200).json({
+        message: "User found. A password reset email has been despatched to your email. Kindly use the link there to reset your password",
+      })
+    } else {
+      res.status(404).json({
+        message: "No user found. Kindly recheck the email."
+      })
+    }
+
+  } catch (error) {
+
+    console.log(error);
+
+  }
+
+})
+
+router.get("/resetpassword/:urlParams", async (req, res) => {
+
+  console.log(req.headers)
+  const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+  await client.connect();
+  let userDBCollection = client.db('user-flow').collection("users");
+
+  let urlDataString = req.params.urlParams
+  try {
+    console.log(urlDataString)
+    let urlData = urlDataString.split('&').map(v => v.split('='));
+    passwordResetEmail = urlData[0][1];
+    timeOfVerification = urlData[1][1];
+    console.log(Date.now() - timeOfVerification);
+
+    let user = await userDBCollection.findOne({
+      email: passwordResetEmail
+    });
+
+  } catch (error) {
+
+  }
+
+  res.status(200).sendFile(path.join(__dirname, "../privatehtml/passwordchange.html"));
+
+  // WE WILL NOW NOT ALLOW THE PASS CHANGE TO HAPPEN
+  // await userDBCollection.updateOne({
+  //   email: passwordResetEmail
+  // }, {$set : { isPassChangeAllow: false }});
+
+})
+
+router.post("/changeuserpassword", authResetPass, (req, res) => {
+
+  console.log("we Came here");
+
+})
+
+function authResetPass(req, res, next) {
+  console.log(req.headers.authorization)
+  if (req.headers.authorization) {
+    let myVerifiedUser = (jwt.verify(req.headers.authorization.split(" ")[1], process.env.RANDOM_KEY_FOR_JWT));
+    if (myVerifiedUser) {
+      req.body.userEmail = myVerifiedUser.user.email
+      next();
+    } else {
+      console.log("Dil bole hadippa")
+      res.status(400).render("../views/login/invalidaccess.pug")
+    }
+
+  } else {
+    // res.status(400).json({message: "Invalid access"})
+    console.log("Dil bole fir se hadippa")
+    res.status(400).render("../views/login/invalidaccess.pug")
+  }
+}
+
+
+/////////////////////////////////////////////////// TEMP ///////////////////////////////////////////////////
 
 router.get('/pug', function (req, res) {
 
